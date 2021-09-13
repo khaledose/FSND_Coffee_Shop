@@ -11,7 +11,7 @@ app = Flask(__name__)
 setup_db(app)
 CORS(app)
 
-# db_drop_and_create_all()
+db_drop_and_create_all()
 
 # ROUTES
 '''
@@ -40,9 +40,9 @@ def get_public_short_drinks():
     returns status code 200 and json {"success": True, "drinks": drinks} where drinks is the list of drinks
     or appropriate status code indicating reason for failure
 '''
-@requires_auth(permission='get:drinks-detail')
 @app.route('/drinks-detail')
-def get_private_short_drinks():
+@requires_auth(permission='get:drinks-detail')
+def get_private_short_drinks(jwt):
     try:
         drinks = Drink.query.all()
         return jsonify({
@@ -50,6 +50,8 @@ def get_private_short_drinks():
             'drinks': [drink.long() for drink in drinks]
         })
     except:
+        if drinks is None:
+            abort(404)
         abort(500)
 
 '''
@@ -60,9 +62,9 @@ def get_private_short_drinks():
     returns status code 200 and json {"success": True, "drinks": drink} where drink an array containing only the newly created drink
     or appropriate status code indicating reason for failure
 '''
-@requires_auth(permission='post:drinks')
 @app.route('/drinks', methods=['POST'])
-def post_private_long_drink():
+@requires_auth(permission='post:drinks')
+def post_private_long_drink(jwt):
     try:
         res = request.get_json()
         title = res.get('title', None)
@@ -71,15 +73,13 @@ def post_private_long_drink():
         drink.insert()
         return jsonify({
             'success': True,
-            'drinks': [drink]
+            'drinks': [drink.long()]
         })
     except:
         db.session.rollback()
         abort(500)
     finally:
         db.session.close()
-
-
 
 '''
     PATCH /drinks/<id>
@@ -91,15 +91,14 @@ def post_private_long_drink():
     returns status code 200 and json {"success": True, "drinks": drink} where drink an array containing only the updated drink
     or appropriate status code indicating reason for failure
 '''
-@requires_auth(permission='patch:drinks')
 @app.route('/drinks/<drink_id>', methods=['PATCH'])
-def patch_private_long_drink(drink_id):
+@requires_auth(permission='patch:drinks')
+def patch_private_long_drink(jwt, drink_id):
     try:
         res = request.get_json()
         drink = Drink.query.get(drink_id)
         drink.title = res.get('title', drink.title)
         drink.recipe = str(res.get('recipe', drink.recipe)).replace('\'','\"')
-        print(drink)
         drink.update()
         return jsonify({
             'success': True,
@@ -122,9 +121,9 @@ def patch_private_long_drink(drink_id):
     returns status code 200 and json {"success": True, "delete": id} where id is the id of the deleted record
     or appropriate status code indicating reason for failure
 '''
-@requires_auth(permission='delete:drinks')
 @app.route('/drinks/<drink_id>', methods=['DELETE'])
-def delete_private_drink(drink_id):
+@requires_auth(permission='delete:drinks')
+def delete_private_drink(jwt, drink_id):
     try:
         drink = Drink.query.get(drink_id)
         drink.delete()
